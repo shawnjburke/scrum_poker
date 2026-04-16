@@ -93,6 +93,7 @@ defmodule ScrumPokerWeb.UserLive.Login do
           id="login_form_password"
           action={~p"/users/log-in"}
           phx-submit="submit_password"
+          phx-change="update_form"
           phx-trigger-action={@trigger_submit}
         >
           <.input
@@ -111,6 +112,15 @@ defmodule ScrumPokerWeb.UserLive.Login do
             autocomplete="current-password"
             spellcheck="false"
           />
+          <div class="flex justify-end -mt-1 mb-2">
+            <button
+              type="button"
+              phx-click="forgot_password"
+              class="text-sm text-base-content/60 hover:text-primary hover:underline cursor-pointer"
+            >
+              Forgot password?
+            </button>
+          </div>
           <.button class="btn btn-primary w-full" name={@form[:remember_me].name} value="true">
             Log in and stay logged in <span aria-hidden="true">→</span>
           </.button>
@@ -137,6 +147,31 @@ defmodule ScrumPokerWeb.UserLive.Login do
   @impl true
   def handle_event("submit_password", _params, socket) do
     {:noreply, assign(socket, :trigger_submit, true)}
+  end
+
+  def handle_event("update_form", %{"user" => params}, socket) do
+    {:noreply, assign(socket, form: to_form(params, as: "user"))}
+  end
+
+  def handle_event("forgot_password", _params, socket) do
+    email = socket.assigns.form.params["email"]
+
+    if email && email != "" do
+      if user = Accounts.get_user_by_email(email) do
+        Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}"))
+      end
+
+      msg =
+        "If that email is in our system, we've sent a login link. " <>
+          "Use it to sign in, then change your password in Settings."
+
+      {:noreply,
+       socket
+       |> put_flash(:info, msg)
+       |> push_navigate(to: ~p"/users/log-in")}
+    else
+      {:noreply, put_flash(socket, :error, "Please enter your email address first.")}
+    end
   end
 
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
