@@ -12,9 +12,54 @@ defmodule ScrumPokerWeb.UserLive.Settings do
       <div class="text-center">
         <.header>
           Account Settings
-          <:subtitle>Manage your account email address and password settings</:subtitle>
+          <:subtitle>Manage your profile, email, and password</:subtitle>
         </.header>
       </div>
+
+      <%!-- Profile section --%>
+      <.form for={@profile_form} id="profile_form" phx-submit="update_profile" phx-change="validate_profile">
+        <div class="flex items-center gap-6 mb-4">
+          <div class="avatar">
+            <div class="w-20 h-20 rounded-full bg-base-300 flex items-center justify-center overflow-hidden">
+              <%= if entry = List.first(@uploads.avatar.entries) do %>
+                <.live_img_preview entry={entry} class="w-full h-full object-cover" />
+              <% else %>
+                <%= if @current_avatar_url do %>
+                  <img src={@current_avatar_url} class="w-full h-full object-cover" />
+                <% else %>
+                  <span class="text-3xl text-base-content/30">
+                    {String.first(@current_scope.user.display_name || @current_scope.user.email)}
+                  </span>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+          <div class="flex-1 space-y-2">
+            <label class="btn btn-sm btn-outline cursor-pointer">
+              <.icon name="hero-camera" class="size-4" /> Change photo
+              <.live_file_input upload={@uploads.avatar} class="hidden" />
+            </label>
+            <p :for={entry <- @uploads.avatar.entries} class="text-xs text-base-content/60">
+              {entry.client_name}
+              <button type="button" phx-click="cancel_upload" phx-value-ref={entry.ref}
+                      class="text-error ml-1">&times;</button>
+            </p>
+            <p :for={err <- upload_errors(@uploads.avatar)} class="text-xs text-error">
+              {upload_error_message(err)}
+            </p>
+          </div>
+        </div>
+
+        <.input
+          field={@profile_form[:display_name]}
+          label="Display Name"
+          placeholder="How others see you"
+          autocomplete="name"
+        />
+        <.button variant="primary" phx-disable-with="Saving...">Save Profile</.button>
+      </.form>
+
+      <div class="divider" />
 
       <.form for={@email_form} id="email_form" phx-submit="update_email" phx-change="validate_email">
         <.input
@@ -87,18 +132,64 @@ defmodule ScrumPokerWeb.UserLive.Settings do
     user = socket.assigns.current_scope.user
     email_changeset = Accounts.change_user_email(user, %{}, validate_unique: false)
     password_changeset = Accounts.change_user_password(user, %{}, hash_password: false)
+    profile_changeset = Accounts.change_user_profile(user, %{})
 
     socket =
       socket
       |> assign(:current_email, user.email)
+      |> assign(:current_avatar_url, user.avatar_url)
+      |> assign(:avatar_preview, nil)
       |> assign(:email_form, to_form(email_changeset))
       |> assign(:password_form, to_form(password_changeset))
+      |> assign(:profile_form, to_form(profile_changeset))
       |> assign(:trigger_submit, false)
+      |> allow_upload(:avatar, accept: ~w(.jpg .jpeg .png .gif .webp), max_entries: 1, max_file_size: 2_000_000)
 
     {:ok, socket}
   end
 
   @impl true
+  def handle_event("validate_profile", %{"user" => params}, socket) do
+    profile_form =
+      socket.assigns.current_scope.user
+      |> Accounts.change_user_profile(params)
+      |> Map.put(:action, :validate)
+      |> to_form()
+
+    {:noreply, assign(socket, profile_form: profile_form)}
+  end
+
+  def handle_event("update_profile", %{"user" => params}, socket) do
+    user = socket.assigns.current_scope.user
+
+    avatar_url =
+      case consume_uploaded_entries(socket, :avatar, &save_avatar/2) do
+        [path] -> path
+        [] -> user.avatar_url
+      end
+
+    params = Map.put(params, "avatar_url", avatar_url)
+
+    case Accounts.update_user_profile(user, params) do
+      {:ok, user} ->
+        profile_form = Accounts.change_user_profile(user, %{}) |> to_form()
+
+        {:noreply,
+         socket
+         |> assign(:current_avatar_url, user.avatar_url)
+         |> assign(:avatar_preview, nil)
+         |> assign(:profile_form, profile_form)
+         |> put_flash(:info, "Profile updated.")}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, profile_form: to_form(changeset, action: :insert))}
+    end
+  end
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :avatar, ref)}
+  end
+
   def handle_event("validate_email", params, socket) do
     %{"user" => user_params} = params
 
@@ -157,4 +248,17 @@ defmodule ScrumPokerWeb.UserLive.Settings do
         {:noreply, assign(socket, password_form: to_form(changeset, action: :insert))}
     end
   end
+
+  defp save_avatar(%{path: path}, entry) do
+    ext = Path.extname(entry.client_name)
+    filename = "avatar_#{entry.uuid}#{ext}"
+    dest = Path.join(["priv", "static", "uploads", filename])
+    File.cp!(path, dest)
+    {:ok, "/uploads/#{filename}"}
+  end
+
+  defp upload_error_message(:too_large), do: "Image must be under 2 MB."
+  defp upload_error_message(:too_many_files), do: "Only one image allowed."
+  defp upload_error_message(:not_accepted), do: "Must be JPG, PNG, GIF, or WebP."
+  defp upload_error_message(_), do: "Upload error."
 end

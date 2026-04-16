@@ -132,6 +132,10 @@ defmodule ScrumPoker.Accounts do
     |> Repo.update()
   end
 
+  def change_user_profile(user, attrs \\ %{}) do
+    User.profile_changeset(user, attrs)
+  end
+
   ## Settings
 
   @doc """

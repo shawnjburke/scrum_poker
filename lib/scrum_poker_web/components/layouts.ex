@@ -44,8 +44,23 @@ defmodule ScrumPokerWeb.Layouts do
       <div class="flex-none">
         <ul class="flex items-center gap-2 px-1">
           <%= if @current_scope && @current_scope.user do %>
-            <li class="hidden sm:block text-sm text-base-content/70">
-              {@current_scope.user.display_name || @current_scope.user.email}
+            <li class="flex items-center gap-2">
+              <.link navigate={~p"/users/settings"} class="flex items-center gap-2 hover:opacity-80">
+                <div class="avatar">
+                  <div class="w-7 h-7 rounded-full bg-base-300 overflow-hidden">
+                    <%= if @current_scope.user.avatar_url do %>
+                      <img src={@current_scope.user.avatar_url} class="w-full h-full object-cover" />
+                    <% else %>
+                      <span class="flex items-center justify-center w-full h-full text-xs font-bold text-base-content/50">
+                        {String.first(@current_scope.user.display_name || @current_scope.user.email)}
+                      </span>
+                    <% end %>
+                  </div>
+                </div>
+                <span class="hidden sm:block text-sm text-base-content/70">
+                  {@current_scope.user.display_name || @current_scope.user.email}
+                </span>
+              </.link>
             </li>
             <li>
               <.link href={~p"/rooms/new"} class="btn btn-sm btn-ghost">Create Room</.link>
