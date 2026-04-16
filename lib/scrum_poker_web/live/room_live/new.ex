@@ -39,6 +39,9 @@ defmodule ScrumPokerWeb.RoomLive.New do
               <option value="tshirt" selected={@form[:card_deck].value == "tshirt"}>
                 T-Shirt Sizes (XS, S, M, L, XL, XXL)
               </option>
+              <option value="dogs" selected={@form[:card_deck].value == "dogs"}>
+                Dogs — Relative Sizing (Chihuahua to Saint Bernard)
+              </option>
             </select>
           </div>
 

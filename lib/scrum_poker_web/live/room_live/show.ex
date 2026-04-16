@@ -368,19 +368,40 @@ defmodule ScrumPokerWeb.RoomLive.Show do
                     <p class="text-xs text-center text-base-content/40 mb-3 uppercase tracking-wider">
                       Pick your estimate
                     </p>
-                    <div class="flex flex-wrap gap-2 justify-center">
-                      <button
-                        :for={value <- card_values(@room)}
-                        phx-click="vote"
-                        phx-value-card={value}
-                        class={[
-                          "btn w-14 h-20 text-lg font-bold border-2 transition-all duration-150",
-                          @my_vote == value && "btn-primary border-primary scale-110 shadow-lg",
-                          @my_vote != value && "btn-outline hover:scale-105"
-                        ]}
-                      >
-                        {value}
-                      </button>
+                    <div class={["flex flex-wrap gap-2 justify-center",
+                                 @room.card_deck == "dogs" && "gap-3"]}>
+                      <%= for value <- card_values(@room) do %>
+                        <%= if @room.card_deck == "dogs" && value not in ["?", "☕"] do %>
+                          <button
+                            phx-click="vote"
+                            phx-value-card={value}
+                            class={[
+                              "flex flex-col items-center gap-1 p-2 rounded-xl border-2 cursor-pointer transition-all duration-150 w-24",
+                              @my_vote == value && "border-primary bg-primary/10 scale-110 shadow-lg",
+                              @my_vote != value && "border-base-300 hover:border-primary/50 hover:scale-105"
+                            ]}
+                          >
+                            <%= if img = dog_image(value) do %>
+                              <img src={"/images/dogs/#{img}"} alt={value} class="w-16 h-16 object-contain" />
+                            <% else %>
+                              <span class="text-3xl">🐕</span>
+                            <% end %>
+                            <span class="text-xs font-semibold leading-tight text-center">{value}</span>
+                          </button>
+                        <% else %>
+                          <button
+                            phx-click="vote"
+                            phx-value-card={value}
+                            class={[
+                              "btn w-14 h-20 text-lg font-bold border-2 transition-all duration-150",
+                              @my_vote == value && "btn-primary border-primary scale-110 shadow-lg",
+                              @my_vote != value && "btn-outline hover:scale-105"
+                            ]}
+                          >
+                            {value}
+                          </button>
+                        <% end %>
+                      <% end %>
                     </div>
                   </div>
 
@@ -400,9 +421,16 @@ defmodule ScrumPokerWeb.RoomLive.Show do
                   <%!-- Vote distribution --%>
                   <div class="flex flex-wrap gap-4 justify-center">
                     <div :for={{value, voters} <- vote_distribution(@votes)} class="flex flex-col items-center gap-1">
-                      <div class="card bg-primary text-primary-content w-14 h-20 flex items-center justify-center text-xl font-bold shadow-md">
-                        {value}
-                      </div>
+                      <%= if @room.card_deck == "dogs" && dog_image(value) do %>
+                        <div class="flex flex-col items-center gap-1 p-2 rounded-xl border-2 border-primary bg-primary/10 w-24 shadow-md">
+                          <img src={"/images/dogs/#{dog_image(value)}"} alt={value} class="w-16 h-16 object-contain" />
+                          <span class="text-xs font-semibold">{value}</span>
+                        </div>
+                      <% else %>
+                        <div class="card bg-primary text-primary-content w-14 h-20 flex items-center justify-center text-xl font-bold shadow-md">
+                          {value}
+                        </div>
+                      <% end %>
                       <span :for={name <- voters} class="text-xs text-center">{name}</span>
                     </div>
                   </div>
@@ -534,6 +562,14 @@ defmodule ScrumPokerWeb.RoomLive.Show do
               <span class="badge badge-primary badge-sm font-mono flex-shrink-0">{t.final_points}</span>
             </li>
           </ul>
+          <a
+            :if={!Enum.empty?(@history)}
+            href={"/rooms/#{@room.code}/export.csv"}
+            class="btn btn-xs btn-outline mt-2 w-full"
+            download
+          >
+            <.icon name="hero-arrow-down-tray" class="size-3" /> Export CSV
+          </a>
         </aside>
       </div>
 
@@ -587,6 +623,7 @@ defmodule ScrumPokerWeb.RoomLive.Show do
   defp find_pending_tickets(_), do: []
 
   defp card_values(room), do: ScrumPoker.Rooms.Room.card_values(room.card_deck)
+  defp dog_image(value), do: ScrumPoker.Rooms.Room.dog_image(value)
 
   defp vote_distribution(votes) do
     votes

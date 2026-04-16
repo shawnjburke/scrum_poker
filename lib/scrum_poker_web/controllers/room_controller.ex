@@ -41,7 +41,44 @@ defmodule ScrumPokerWeb.RoomController do
     |> redirect(to: ~p"/rooms/#{code}/join")
   end
 
+  @doc """
+  Exports the session history as a CSV download.
+  """
+  def export_csv(conn, %{"code" => code}) do
+    code = String.upcase(code)
+
+    case Rooms.get_room_by_code(code) do
+      nil ->
+        conn
+        |> put_flash(:error, "Room not found.")
+        |> redirect(to: ~p"/")
+
+      room ->
+        tickets = Rooms.list_accepted_tickets(room.id)
+
+        csv =
+          [["Ticket ID", "Title", "Story Points", "Accepted At"]]
+          |> Enum.concat(
+            Enum.map(tickets, fn t ->
+              [t.external_id || "", t.title, t.final_points || "", format_datetime(t.updated_at)]
+            end)
+          )
+          |> Enum.map(&Enum.join(&1, ","))
+          |> Enum.join("\r\n")
+
+        filename = "#{room.name |> String.replace(~r/[^a-zA-Z0-9_\- ]/, "") |> String.trim()}_history.csv"
+
+        conn
+        |> put_resp_content_type("text/csv")
+        |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
+        |> send_resp(200, csv)
+    end
+  end
+
   defp generate_token do
     :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
   end
+
+  defp format_datetime(nil), do: ""
+  defp format_datetime(dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
 end

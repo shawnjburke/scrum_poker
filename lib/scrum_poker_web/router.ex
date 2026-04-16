@@ -21,6 +21,7 @@ defmodule ScrumPokerWeb.Router do
     pipe_through :browser
 
     post "/rooms/:code/join", RoomController, :join
+    get "/rooms/:code/export.csv", RoomController, :export_csv
   end
 
   # OAuth routes

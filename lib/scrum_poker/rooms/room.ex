@@ -3,7 +3,7 @@ defmodule ScrumPoker.Rooms.Room do
   import Ecto.Changeset
 
   @valid_statuses ~w(waiting voting revealed concluded)
-  @valid_decks ~w(fibonacci modified_fibonacci tshirt)
+  @valid_decks ~w(fibonacci modified_fibonacci tshirt dogs)
 
   schema "rooms" do
     field :code, :string
@@ -48,5 +48,18 @@ defmodule ScrumPoker.Rooms.Room do
   def card_values("fibonacci"), do: ~w(0 1 2 3 5 8 13 21 40 100 ? ☕)
   def card_values("modified_fibonacci"), do: ~w(0 ½ 1 2 3 5 8 13 20 40 100 ? ☕)
   def card_values("tshirt"), do: ~w(XS S M L XL XXL ? ☕)
+  def card_values("dogs"), do: ["Chihuahua", "Dachshund", "Beagle", "Labrador", "Husky", "Great Dane", "Saint Bernard", "?", "☕"]
   def card_values(_), do: card_values("fibonacci")
+
+  @doc """
+  Returns the image filename for a dog breed card, or nil for non-dog decks.
+  """
+  def dog_image("Chihuahua"), do: "chihuahua.png"
+  def dog_image("Dachshund"), do: "dachshund.png"
+  def dog_image("Beagle"), do: "beagle.png"
+  def dog_image("Labrador"), do: "labrador.png"
+  def dog_image("Husky"), do: "husky.png"
+  def dog_image("Great Dane"), do: "great_dane.png"
+  def dog_image("Saint Bernard"), do: "saint_bernard.png"
+  def dog_image(_), do: nil
 end
