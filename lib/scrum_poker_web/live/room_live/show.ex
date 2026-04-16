@@ -73,9 +73,10 @@ defmodule ScrumPokerWeb.RoomLive.Show do
              |> assign(:new_ticket_form, to_form(%{}, as: "ticket"))
              |> assign(:pending_tickets, pending_tickets)
              |> assign(:final_points_input, "")
-             |> assign(:voted_keys, MapSet.new())
-             |> assign(:vote_count, 0)
-             |> assign(:voter_count, count_voters(presences))}
+             |> assign(:voted_keys, seed_voted_keys(presences))
+             |> assign(:vote_count, count_voted_from_presences(presences))
+             |> assign(:voter_count, count_voters(presences))
+             |> assign(:mobile_tab, "vote")}
         end
     end
   end
@@ -256,6 +257,10 @@ defmodule ScrumPokerWeb.RoomLive.Show do
     {:noreply, assign(socket, :final_points_input, v)}
   end
 
+  def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, :mobile_tab, tab)}
+  end
+
   # ---------------------------------------------------------------------------
   # Render
   # ---------------------------------------------------------------------------
@@ -282,11 +287,40 @@ defmodule ScrumPokerWeb.RoomLive.Show do
         </div>
       </div>
 
+      <%!-- Mobile tab bar --%>
+      <div class="flex lg:hidden border-b border-base-300 bg-base-200/60">
+        <button
+          phx-click="switch_tab" phx-value-tab="people"
+          class={["flex-1 py-2.5 text-xs font-semibold text-center uppercase tracking-wider transition-colors",
+                  @mobile_tab == "people" && "text-primary border-b-2 border-primary",
+                  @mobile_tab != "people" && "text-base-content/50 hover:text-base-content/80"]}
+        >
+          People ({length(@presences)})
+        </button>
+        <button
+          phx-click="switch_tab" phx-value-tab="vote"
+          class={["flex-1 py-2.5 text-xs font-semibold text-center uppercase tracking-wider transition-colors",
+                  @mobile_tab == "vote" && "text-primary border-b-2 border-primary",
+                  @mobile_tab != "vote" && "text-base-content/50 hover:text-base-content/80"]}
+        >
+          Vote
+        </button>
+        <button
+          phx-click="switch_tab" phx-value-tab="history"
+          class={["flex-1 py-2.5 text-xs font-semibold text-center uppercase tracking-wider transition-colors",
+                  @mobile_tab == "history" && "text-primary border-b-2 border-primary",
+                  @mobile_tab != "history" && "text-base-content/50 hover:text-base-content/80"]}
+        >
+          History ({length(@history)})
+        </button>
+      </div>
+
       <%!-- Main 3-column layout --%>
       <div class="flex-1 grid grid-cols-1 lg:grid-cols-[200px_1fr_200px] overflow-hidden min-h-0">
 
         <%!-- Left: Participants --%>
-        <aside class="bg-base-200/40 border-r border-base-300 p-4 overflow-y-auto hidden lg:flex lg:flex-col gap-3">
+        <aside class={["bg-base-200/40 border-r border-base-300 p-4 overflow-y-auto flex-col gap-3",
+                       @mobile_tab == "people" && "flex" || "hidden lg:flex"]}>
           <h3 class="font-semibold text-xs uppercase tracking-wider text-base-content/50">
             Participants ({length(@presences)})
           </h3>
@@ -313,7 +347,8 @@ defmodule ScrumPokerWeb.RoomLive.Show do
         </aside>
 
         <%!-- Center: Voting area --%>
-        <main class="flex flex-col overflow-y-auto p-4 sm:p-6 gap-6">
+        <main class={["flex-col overflow-y-auto p-4 sm:p-6 gap-6",
+                      @mobile_tab == "vote" && "flex" || "hidden lg:flex"]}>
           <%= cond do %>
             <% is_nil(@current_ticket) -> %>
               <%!-- Waiting state --%>
@@ -546,7 +581,8 @@ defmodule ScrumPokerWeb.RoomLive.Show do
         </main>
 
         <%!-- Right: History --%>
-        <aside class="bg-base-200/40 border-l border-base-300 p-4 overflow-y-auto hidden lg:flex lg:flex-col gap-3">
+        <aside class={["bg-base-200/40 border-l border-base-300 p-4 overflow-y-auto flex-col gap-3",
+                       @mobile_tab == "history" && "flex" || "hidden lg:flex"]}>
           <h3 class="font-semibold text-xs uppercase tracking-wider text-base-content/50">
             Session History
           </h3>
@@ -613,6 +649,17 @@ defmodule ScrumPokerWeb.RoomLive.Show do
   end
 
   defp count_voters(presences), do: Enum.count(presences, &(&1.meta.role != "observer"))
+
+  defp seed_voted_keys(presences) do
+    presences
+    |> Enum.filter(& &1.meta.voted)
+    |> Enum.map(& &1.key)
+    |> MapSet.new()
+  end
+
+  defp count_voted_from_presences(presences) do
+    Enum.count(presences, &(&1.meta.voted && &1.meta.role != "observer"))
+  end
 
   defp find_current_ticket(%{tickets: tickets}),
     do: Enum.find(tickets, &(&1.status in ["voting", "revealed"]))
