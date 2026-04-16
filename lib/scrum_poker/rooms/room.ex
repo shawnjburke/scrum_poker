@@ -61,5 +61,7 @@ defmodule ScrumPoker.Rooms.Room do
   def dog_image("Husky"), do: "husky.png"
   def dog_image("Great Dane"), do: "great_dane.png"
   def dog_image("Saint Bernard"), do: "saint_bernard.png"
+  def dog_image("?"), do: "question.png"
+  def dog_image("☕"), do: "coffee.png"
   def dog_image(_), do: nil
 end

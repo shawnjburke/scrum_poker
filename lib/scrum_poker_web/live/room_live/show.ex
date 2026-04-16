@@ -406,7 +406,7 @@ defmodule ScrumPokerWeb.RoomLive.Show do
                     <div class={["flex flex-wrap gap-2 justify-center",
                                  @room.card_deck == "dogs" && "gap-3"]}>
                       <%= for value <- card_values(@room) do %>
-                        <%= if @room.card_deck == "dogs" && value not in ["?", "☕"] do %>
+                        <%= if @room.card_deck == "dogs" do %>
                           <button
                             phx-click="vote"
                             phx-value-card={value}
