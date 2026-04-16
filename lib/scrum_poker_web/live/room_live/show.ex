@@ -455,7 +455,7 @@ defmodule ScrumPokerWeb.RoomLive.Show do
 
                   <%!-- Vote distribution --%>
                   <div class="flex flex-wrap gap-4 justify-center">
-                    <div :for={{value, voters} <- vote_distribution(@votes)} class="flex flex-col items-center gap-1">
+                    <div :for={{value, voters} <- vote_distribution(@votes)} class="card-flip flex flex-col items-center gap-1">
                       <%= if @room.card_deck == "dogs" && dog_image(value) do %>
                         <div class="flex flex-col items-center gap-1 p-2 rounded-xl border-2 border-primary bg-primary/10 w-24 shadow-md">
                           <img src={"/images/dogs/#{dog_image(value)}"} alt={value} class="w-16 h-16 object-contain" />
@@ -471,14 +471,16 @@ defmodule ScrumPokerWeb.RoomLive.Show do
                   </div>
 
                   <%!-- Consensus / spread --%>
-                  <div class={["alert justify-center text-center text-sm",
-                               consensus?(@votes) && "alert-success" || "alert-warning"]}>
-                    <%= if consensus?(@votes) do %>
+                  <%= if consensus?(@votes) do %>
+                    <div id="consensus-confetti" phx-hook="Confetti"
+                         class="alert alert-success justify-center text-center text-sm">
                       🎉 Consensus! Everyone voted <strong class="mx-1">{hd(@votes).value}</strong>
-                    <% else %>
+                    </div>
+                  <% else %>
+                    <div class="alert alert-warning justify-center text-center text-sm">
                       Votes differ — discuss before accepting.
-                    <% end %>
-                  </div>
+                    </div>
+                  <% end %>
 
                   <%!-- SM accept controls --%>
                   <div :if={@is_scrum_master} class="card bg-base-200">

@@ -33,6 +33,55 @@ let Hooks = {
         setTimeout(() => { this.el.value = "" }, 0)
       })
     }
+  },
+  Confetti: {
+    mounted() {
+      const canvas = document.createElement("canvas")
+      canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999"
+      document.body.appendChild(canvas)
+      const ctx = canvas.getContext("2d")
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+
+      const colors = ["#ff6b6b","#feca57","#48dbfb","#ff9ff3","#54a0ff","#5f27cd","#01a3a4","#f368e0","#00d2d3","#ff6348"]
+      const particles = Array.from({length: 150}, () => ({
+        x: canvas.width / 2 + (Math.random() - 0.5) * 300,
+        y: canvas.height / 2 + 50,
+        vx: (Math.random() - 0.5) * 16,
+        vy: Math.random() * -18 - 4,
+        size: Math.random() * 8 + 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * 360,
+        rotV: (Math.random() - 0.5) * 12,
+        opacity: 1
+      }))
+
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        let alive = false
+        for (const p of particles) {
+          p.x += p.vx
+          p.vx *= 0.99
+          p.vy += 0.35
+          p.y += p.vy
+          p.rot += p.rotV
+          p.opacity -= 0.006
+          if (p.opacity > 0 && p.y < canvas.height + 100) {
+            alive = true
+            ctx.save()
+            ctx.translate(p.x, p.y)
+            ctx.rotate(p.rot * Math.PI / 180)
+            ctx.globalAlpha = Math.max(0, p.opacity)
+            ctx.fillStyle = p.color
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6)
+            ctx.restore()
+          }
+        }
+        if (alive) requestAnimationFrame(animate)
+        else canvas.remove()
+      }
+      requestAnimationFrame(animate)
+    }
   }
 }
 

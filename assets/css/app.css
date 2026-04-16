@@ -103,3 +103,29 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* Card flip animation for vote reveal */
+@keyframes card-flip-in {
+  0% {
+    transform: rotateY(180deg) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotateY(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.card-flip {
+  animation: card-flip-in 0.6s ease-out both;
+  perspective: 800px;
+}
+
+.card-flip:nth-child(2) { animation-delay: 0.1s; }
+.card-flip:nth-child(3) { animation-delay: 0.2s; }
+.card-flip:nth-child(4) { animation-delay: 0.3s; }
+.card-flip:nth-child(5) { animation-delay: 0.4s; }
+.card-flip:nth-child(6) { animation-delay: 0.5s; }
