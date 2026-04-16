@@ -78,7 +78,7 @@ config :ueberauth, Ueberauth,
   providers: [
     google: {Ueberauth.Strategy.Google, [default_scope: "email profile"]},
     github: {Ueberauth.Strategy.Github, [default_scope: "user:email"]},
-    microsoft: {Ueberauth.Strategy.Microsoft, [tenant: "common"]}
+    microsoft: {Ueberauth.Strategy.Microsoft, [tenant: "common", default_scope: "openid email profile"]}
   ]
 
 # OAuth strategy credentials are loaded at runtime — see config/runtime.exs
