@@ -38,3 +38,7 @@ npm-debug.log
 # Claude Code local settings
 /.claude/
 
+# Dev startup script with secrets
+start_dev.bat
+.env
+

@@ -81,18 +81,7 @@ config :ueberauth, Ueberauth,
     microsoft: {Ueberauth.Strategy.Microsoft, [tenant: "common"]}
   ]
 
-config :ueberauth, Ueberauth.Strategy.Google.OAuth,
-  client_id: System.get_env("GOOGLE_CLIENT_ID"),
-  client_secret: System.get_env("GOOGLE_CLIENT_SECRET")
-
-config :ueberauth, Ueberauth.Strategy.Github.OAuth,
-  client_id: System.get_env("GITHUB_CLIENT_ID"),
-  client_secret: System.get_env("GITHUB_CLIENT_SECRET")
-
-config :ueberauth, Ueberauth.Strategy.Microsoft.OAuth,
-  client_id: System.get_env("MICROSOFT_CLIENT_ID"),
-  client_secret: System.get_env("MICROSOFT_CLIENT_SECRET"),
-  tenant_id: System.get_env("MICROSOFT_TENANT_ID", "common")
+# OAuth strategy credentials are loaded at runtime — see config/runtime.exs
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
