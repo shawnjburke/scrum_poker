@@ -79,6 +79,31 @@ defmodule ScrumPoker.Rooms do
     |> Repo.all()
   end
 
+  def import_tickets(room, ticket_attrs_list) when is_list(ticket_attrs_list) do
+    start_position = next_ticket_position(room.id)
+
+    results =
+      ticket_attrs_list
+      |> Enum.with_index(start_position)
+      |> Enum.map(fn {attrs, pos} ->
+        attrs =
+          attrs
+          |> Map.put(:room_id, room.id)
+          |> Map.put(:position, pos)
+          |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+          |> Map.new()
+
+        %Ticket{}
+        |> Ticket.changeset(attrs)
+        |> Repo.insert()
+      end)
+
+    successes = Enum.filter(results, &match?({:ok, _}, &1)) |> Enum.map(&elem(&1, 1))
+    failures = Enum.filter(results, &match?({:error, _}, &1))
+
+    {:ok, successes, failures}
+  end
+
   defp next_ticket_position(room_id) do
     Ticket
     |> where([t], t.room_id == ^room_id)

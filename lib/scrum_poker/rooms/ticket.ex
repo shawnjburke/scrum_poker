@@ -12,6 +12,10 @@ defmodule ScrumPoker.Rooms.Ticket do
     field :status, :string, default: "pending"
     field :final_points, :string
     field :position, :integer, default: 0
+    field :issue_type, :string
+    field :issue_id, :string
+    field :parent_id, :string
+    field :priority, :string
 
     belongs_to :room, ScrumPoker.Rooms.Room
     has_many :votes, ScrumPoker.Rooms.Vote
@@ -19,9 +23,11 @@ defmodule ScrumPoker.Rooms.Ticket do
     timestamps(type: :utc_datetime)
   end
 
+  @cast_fields ~w(external_id title description url room_id position issue_type issue_id parent_id priority)a
+
   def changeset(ticket, attrs) do
     ticket
-    |> cast(attrs, [:external_id, :title, :description, :url, :room_id, :position])
+    |> cast(attrs, @cast_fields)
     |> validate_required([:title, :room_id])
     |> validate_length(:title, max: 255)
   end

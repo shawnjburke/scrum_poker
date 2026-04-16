@@ -70,7 +70,9 @@ defmodule ScrumPokerWeb.RoomLive.Show do
              |> assign(:participant_name, participant_name)
              |> assign(:presence_key, presence_key)
              |> assign(:show_add_ticket_form, false)
+             |> assign(:show_import_form, false)
              |> assign(:new_ticket_form, to_form(%{}, as: "ticket"))
+             |> allow_upload(:jira_csv, accept: ~w(.csv), max_entries: 1, max_file_size: 5_000_000)
              |> assign(:pending_tickets, pending_tickets)
              |> assign(:final_points_input, "")
              |> assign(:voted_keys, seed_voted_keys(presences))
@@ -224,8 +226,60 @@ defmodule ScrumPokerWeb.RoomLive.Show do
   def handle_event("start_ticket", _params, socket), do: {:noreply, socket}
 
   def handle_event("toggle_add_ticket", _params, socket) do
-    {:noreply, assign(socket, :show_add_ticket_form, !socket.assigns.show_add_ticket_form)}
+    {:noreply,
+     socket
+     |> assign(:show_add_ticket_form, !socket.assigns.show_add_ticket_form)
+     |> assign(:show_import_form, false)}
   end
+
+  def handle_event("toggle_import", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_import_form, !socket.assigns.show_import_form)
+     |> assign(:show_add_ticket_form, false)}
+  end
+
+  def handle_event("validate_import", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_import_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :jira_csv, ref)}
+  end
+
+  def handle_event("import_tickets", _params, %{assigns: %{is_scrum_master: true}} = socket) do
+    {completed, []} = uploaded_entries(socket, :jira_csv)
+
+    if completed == [] do
+      {:noreply, put_flash(socket, :error, "Please select a CSV file first.")}
+    else
+      results =
+        consume_uploaded_entries(socket, :jira_csv, fn %{path: path}, entry ->
+          {:ok, ScrumPoker.Rooms.JiraImport.parse_file(path, entry.client_name)}
+        end)
+
+      case results do
+        [{:ok, ticket_attrs}] ->
+          {:ok, imported, _failures} = Rooms.import_tickets(socket.assigns.room, ticket_attrs)
+
+          for ticket <- imported do
+            PubSub.broadcast(ScrumPoker.PubSub, "room:#{socket.assigns.room.code}",
+              {:ticket_added, ticket})
+          end
+
+          {:noreply,
+           socket
+           |> assign(:show_import_form, false)
+           |> put_flash(:info, "Imported #{length(imported)} tickets.")}
+
+        [{:error, message}] ->
+          {:noreply, put_flash(socket, :error, message)}
+
+        _ ->
+          {:noreply, put_flash(socket, :error, "Could not process file.")}
+      end
+    end
+  end
+
+  def handle_event("import_tickets", _params, socket), do: {:noreply, socket}
 
   def handle_event("add_ticket", %{"ticket" => params}, %{assigns: %{is_scrum_master: true}} = socket) do
     case Rooms.add_ticket(socket.assigns.room, params) do
@@ -529,12 +583,48 @@ defmodule ScrumPokerWeb.RoomLive.Show do
               </div>
           <% end %>
 
-          <%!-- SM: Add ticket + queue --%>
+          <%!-- SM: Add ticket + import + queue --%>
           <div :if={@is_scrum_master} class="max-w-2xl mx-auto w-full border-t border-base-300 pt-4 space-y-3">
-            <button phx-click="toggle_add_ticket" class="btn btn-sm btn-outline">
-              <.icon name={if @show_add_ticket_form, do: "hero-minus", else: "hero-plus"} class="size-4" />
-              {if @show_add_ticket_form, do: "Cancel", else: "Add Ticket"}
-            </button>
+            <div class="flex gap-2 flex-wrap">
+              <button phx-click="toggle_add_ticket" class="btn btn-sm btn-outline">
+                <.icon name={if @show_add_ticket_form, do: "hero-minus", else: "hero-plus"} class="size-4" />
+                {if @show_add_ticket_form, do: "Cancel", else: "Add Ticket"}
+              </button>
+              <button phx-click="toggle_import" class="btn btn-sm btn-outline">
+                <.icon name={if @show_import_form, do: "hero-minus", else: "hero-arrow-up-tray"} class="size-4" />
+                {if @show_import_form, do: "Cancel", else: "Import from Jira"}
+              </button>
+            </div>
+
+            <div :if={@show_import_form} class="card bg-base-200">
+              <div class="card-body py-4 space-y-3">
+                <p class="text-sm text-base-content/70">
+                  Upload a Jira CSV export. Required columns: <strong>Issue key</strong>, <strong>Summary</strong>.
+                  Optional: Issue Type, Issue id, Parent id, Priority.
+                </p>
+                <form id="import-form" phx-submit="import_tickets" phx-change="validate_import">
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <label class="btn btn-sm btn-outline cursor-pointer">
+                      <.icon name="hero-document-arrow-up" class="size-4" /> Choose CSV file
+                      <.live_file_input upload={@uploads.jira_csv} class="hidden" />
+                    </label>
+                    <span :for={entry <- @uploads.jira_csv.entries} class="text-sm text-base-content/70">
+                      {entry.client_name}
+                      <button type="button" phx-click="cancel_import_upload" phx-value-ref={entry.ref}
+                              class="text-error ml-1">&times;</button>
+                    </span>
+                  </div>
+                  <p :for={err <- upload_errors(@uploads.jira_csv)} class="text-xs text-error mt-1">
+                    {import_upload_error(err)}
+                  </p>
+                  <%= if @uploads.jira_csv.entries != [] do %>
+                    <button type="submit" class="btn btn-primary btn-sm mt-3">
+                      Import Tickets
+                    </button>
+                  <% end %>
+                </form>
+              </div>
+            </div>
 
             <div :if={@show_add_ticket_form} class="card bg-base-200">
               <div class="card-body py-4">
@@ -673,6 +763,11 @@ defmodule ScrumPokerWeb.RoomLive.Show do
 
   defp card_values(room), do: ScrumPoker.Rooms.Room.card_values(room.card_deck)
   defp dog_image(value), do: ScrumPoker.Rooms.Room.dog_image(value)
+
+  defp import_upload_error(:too_large), do: "File must be under 5 MB."
+  defp import_upload_error(:too_many_files), do: "Only one file at a time."
+  defp import_upload_error(:not_accepted), do: "Must be a CSV file."
+  defp import_upload_error(_), do: "Upload error."
 
   defp vote_distribution(votes) do
     votes
