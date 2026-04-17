@@ -27,6 +27,20 @@ import topbar from "../vendor/topbar"
 
 let Hooks = {
   ...colocatedHooks,
+  CopyToClipboard: {
+    mounted() {
+      this.el.addEventListener("click", () => {
+        const text = this.el.dataset.copyText
+        if (text && navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(() => {
+            const orig = this.el.innerHTML
+            this.el.innerHTML = "✓ Copied!"
+            setTimeout(() => { this.el.innerHTML = orig }, 1500)
+          })
+        }
+      })
+    }
+  },
   ClearOnSubmit: {
     mounted() {
       this.el.form.addEventListener("submit", () => {

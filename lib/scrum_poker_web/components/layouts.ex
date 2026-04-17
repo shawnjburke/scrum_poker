@@ -63,7 +63,7 @@ defmodule ScrumPokerWeb.Layouts do
               </.link>
             </li>
             <li>
-              <.link href={~p"/rooms/new"} class="btn btn-sm btn-ghost">Create Room</.link>
+              <.link href={~p"/rooms"} class="btn btn-sm btn-ghost">My Rooms</.link>
             </li>
             <li>
               <.link href={~p"/users/log-out"} method="delete" class="btn btn-sm btn-ghost">

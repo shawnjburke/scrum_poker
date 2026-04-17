@@ -64,6 +64,7 @@ defmodule ScrumPokerWeb.Router do
       on_mount: [{ScrumPokerWeb.UserAuth, :require_authenticated}] do
       live "/users/settings", UserLive.Settings, :edit
       live "/users/settings/confirm-email/:token", UserLive.Settings, :confirm_email
+      live "/rooms", RoomLive.Index, :index
       live "/rooms/new", RoomLive.New, :new
     end
 

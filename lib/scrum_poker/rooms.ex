@@ -115,6 +115,12 @@ defmodule ScrumPoker.Rooms do
   # Votes
   # ---------------------------------------------------------------------------
 
+  def clear_votes_for_ticket(ticket_id) do
+    Vote
+    |> where([v], v.ticket_id == ^ticket_id)
+    |> Repo.delete_all()
+  end
+
   def cast_vote(ticket, value, opts \\ []) do
     user_id = Keyword.get(opts, :user_id)
     guest_token = Keyword.get(opts, :guest_token)

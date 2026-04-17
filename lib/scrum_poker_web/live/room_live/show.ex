@@ -78,7 +78,8 @@ defmodule ScrumPokerWeb.RoomLive.Show do
              |> assign(:voted_keys, seed_voted_keys(presences))
              |> assign(:vote_count, count_voted_from_presences(presences))
              |> assign(:voter_count, count_voters(presences))
-             |> assign(:mobile_tab, "vote")}
+             |> assign(:mobile_tab, "vote")
+             |> assign(:page_title, "#{room.name} — #{room.code}")}
         end
     end
   end
@@ -137,6 +138,10 @@ defmodule ScrumPokerWeb.RoomLive.Show do
      |> assign(:my_vote, nil)
      |> assign(:voted_keys, MapSet.new())
      |> assign(:vote_count, 0)}
+  end
+
+  def handle_info({:session_ended, room}, socket) do
+    {:noreply, assign(socket, room: room, current_ticket: nil)}
   end
 
   def handle_info({:vote_cast, voter_key}, socket) do
@@ -206,7 +211,9 @@ defmodule ScrumPokerWeb.RoomLive.Show do
   def handle_event("accept", _params, socket), do: {:noreply, socket}
 
   def handle_event("revote", _params, %{assigns: %{is_scrum_master: true}} = socket) do
-    {:ok, updated} = Rooms.update_ticket_status(socket.assigns.current_ticket, "voting")
+    ticket = socket.assigns.current_ticket
+    Rooms.clear_votes_for_ticket(ticket.id)
+    {:ok, updated} = Rooms.update_ticket_status(ticket, "voting")
     PubSub.broadcast(ScrumPoker.PubSub, "room:#{socket.assigns.room.code}", {:revote_triggered, updated})
     {:noreply, socket}
   end
@@ -315,6 +322,15 @@ defmodule ScrumPokerWeb.RoomLive.Show do
     {:noreply, assign(socket, :mobile_tab, tab)}
   end
 
+  def handle_event("end_session", _params, %{assigns: %{is_scrum_master: true}} = socket) do
+    {:ok, updated_room} = Rooms.update_room_status(socket.assigns.room, "concluded")
+    PubSub.broadcast(ScrumPoker.PubSub, "room:#{socket.assigns.room.code}",
+      {:session_ended, updated_room})
+    {:noreply, socket}
+  end
+
+  def handle_event("end_session", _params, socket), do: {:noreply, socket}
+
   # ---------------------------------------------------------------------------
   # Render
   # ---------------------------------------------------------------------------
@@ -325,11 +341,46 @@ defmodule ScrumPokerWeb.RoomLive.Show do
     <div class="min-h-screen flex flex-col bg-base-100">
       <%!-- Room header --%>
       <div class="navbar bg-base-200 shadow-sm px-4 gap-3 flex-shrink-0">
+        <.link
+          :if={@current_user}
+          navigate={~p"/rooms"}
+          class="btn btn-sm btn-ghost flex-shrink-0"
+          title="Back to My Rooms"
+        >
+          <.icon name="hero-arrow-left" class="size-4" />
+          <span class="hidden sm:inline">Rooms</span>
+        </.link>
+        <.link
+          :if={is_nil(@current_user)}
+          navigate={~p"/"}
+          class="btn btn-sm btn-ghost flex-shrink-0"
+          title="Home"
+        >
+          <.icon name="hero-home" class="size-4" />
+        </.link>
         <div class="flex-1 min-w-0">
           <span class="font-bold text-base truncate">{@room.name}</span>
           <span class="badge badge-neutral font-mono text-xs ml-2">{@room.code}</span>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
+          <button
+            id="copy-room-link"
+            phx-hook="CopyToClipboard"
+            data-copy-text={url(~p"/rooms/#{@room.code}")}
+            class="btn btn-sm btn-ghost"
+            title="Copy room link"
+          >
+            <.icon name="hero-link" class="size-4" /> Share
+          </button>
+          <button
+            :if={@is_scrum_master && @room.status != "concluded"}
+            phx-click="end_session"
+            data-confirm="End this session? The room will be locked and no more voting can occur."
+            class="btn btn-sm btn-ghost text-error"
+            title="End session"
+          >
+            <.icon name="hero-stop-circle" class="size-4" /> End
+          </button>
           <span class="text-sm hidden md:block text-base-content/70">
             {@participant_name}
             <span :if={is_nil(@current_user)} class="badge badge-ghost badge-xs ml-1">guest</span>
@@ -404,6 +455,55 @@ defmodule ScrumPokerWeb.RoomLive.Show do
         <main class={["flex-col overflow-y-auto p-4 sm:p-6 gap-6",
                       @mobile_tab == "vote" && "flex" || "hidden lg:flex"]}>
           <%= cond do %>
+            <% @room.status == "concluded" -> %>
+              <%!-- Session ended summary --%>
+              <div class="flex flex-col items-center flex-1 py-8 gap-6 max-w-xl mx-auto w-full">
+                <div class="text-5xl">🏁</div>
+                <h2 class="text-xl font-bold">Session Complete</h2>
+                <p class="text-sm text-base-content/60">{@room.name}</p>
+
+                <%= if Enum.empty?(@history) do %>
+                  <p class="text-base-content/50">No tickets were estimated in this session.</p>
+                <% else %>
+                  <div class="w-full overflow-x-auto">
+                    <table class="table table-sm w-full">
+                      <thead>
+                        <tr>
+                          <th>Ticket</th>
+                          <th>Summary</th>
+                          <th class="text-right">Points</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr :for={t <- @history}>
+                          <td class="font-mono text-xs">{t.external_id || "—"}</td>
+                          <td>{t.title}</td>
+                          <td class="text-right">
+                            <span class="badge badge-primary badge-sm font-mono">{t.final_points}</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="font-semibold">
+                          <td colspan="2">{length(@history)} tickets estimated</td>
+                          <td class="text-right">
+                            <span class="badge badge-neutral badge-sm font-mono">{total_points(@history)}</span>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <a
+                    href={"/rooms/#{@room.code}/export.csv"}
+                    class="btn btn-outline btn-sm"
+                    download
+                  >
+                    <.icon name="hero-arrow-down-tray" class="size-4" /> Download CSV
+                  </a>
+                <% end %>
+              </div>
+
             <% is_nil(@current_ticket) -> %>
               <%!-- Waiting state --%>
               <div class="flex flex-col items-center justify-center flex-1 text-center gap-4 py-12">
@@ -584,7 +684,7 @@ defmodule ScrumPokerWeb.RoomLive.Show do
           <% end %>
 
           <%!-- SM: Add ticket + import + queue --%>
-          <div :if={@is_scrum_master} class="max-w-2xl mx-auto w-full border-t border-base-300 pt-4 space-y-3">
+          <div :if={@is_scrum_master && @room.status != "concluded"} class="max-w-2xl mx-auto w-full border-t border-base-300 pt-4 space-y-3">
             <div class="flex gap-2 flex-wrap">
               <button phx-click="toggle_add_ticket" class="btn btn-sm btn-outline">
                 <.icon name={if @show_add_ticket_form, do: "hero-minus", else: "hero-plus"} class="size-4" />
@@ -763,6 +863,18 @@ defmodule ScrumPokerWeb.RoomLive.Show do
 
   defp card_values(room), do: ScrumPoker.Rooms.Room.card_values(room.card_deck)
   defp dog_image(value), do: ScrumPoker.Rooms.Room.dog_image(value)
+
+  defp total_points(history) do
+    history
+    |> Enum.map(fn t ->
+      case t.final_points && Integer.parse(t.final_points) do
+        {n, _} -> n
+        _ -> 0
+      end
+    end)
+    |> Enum.sum()
+    |> to_string()
+  end
 
   defp import_upload_error(:too_large), do: "File must be under 5 MB."
   defp import_upload_error(:too_many_files), do: "Only one file at a time."
