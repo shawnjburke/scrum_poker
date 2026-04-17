@@ -70,6 +70,79 @@ defmodule ScrumPokerWeb.Persona do
     }
   end
 
+  @doc "Builds an anonymous (logged-out) persona for testing auth flows."
+  def anonymous(name) do
+    %__MODULE__{
+      name: name,
+      type: :anonymous,
+      conn: Phoenix.ConnTest.build_conn() |> Plug.Test.init_test_session(%{})
+    }
+  end
+
+  @doc "Gives the persona an existing (confirmed) account but doesn't log them in."
+  def has_account_with_email(%__MODULE__{} = p, email) do
+    user = ScrumPoker.AccountsFixtures.user_fixture(%{email: email})
+    %{p | user: user}
+  end
+
+  @doc "Visits a path, mounting the LiveView at that route. Follows live redirects."
+  def visits(%__MODULE__{} = p, path) do
+    case live(p.conn, path) do
+      {:ok, view, _html} ->
+        %{p | view: view}
+
+      {:error, {:live_redirect, %{to: to}}} ->
+        visits(p, to)
+
+      {:error, {:redirect, %{to: to}}} ->
+        visits(p, to)
+    end
+  end
+
+  @doc "Submits the registration form with the given email."
+  def registers_with_email(%__MODULE__{} = p, email) do
+    p.view
+    |> form("#registration_form", user: %{email: email})
+    |> render_submit()
+    |> maybe_follow_redirect(p)
+  end
+
+  @doc "Types an email into the password login form (triggers phx-change)."
+  def enters_in_password_form(%__MODULE__{} = p, email) do
+    p.view
+    |> form("#login_form_password", user: %{email: email, password: ""})
+    |> render_change()
+
+    p
+  end
+
+  @doc "Clicks the Forgot password? button on the login page."
+  def clicks_forgot_password(%__MODULE__{} = p) do
+    p.view
+    |> element("button[phx-click='forgot_password']")
+    |> render_click()
+    |> maybe_follow_redirect(p)
+  end
+
+  @doc "Generates a fresh magic login token for the persona's account and visits the link."
+  def opens_magic_link(%__MODULE__{user: user} = p) when not is_nil(user) do
+    {token, _user_token} = ScrumPoker.AccountsFixtures.generate_user_magic_link_token(user)
+    visits(p, "/users/log-in/#{token}")
+  end
+
+  defp maybe_follow_redirect(rendered_or_redirect, %__MODULE__{} = p) do
+    case rendered_or_redirect do
+      {:error, {:live_redirect, %{to: to}}} ->
+        visits(p, to)
+
+      {:error, {:redirect, %{to: to}}} ->
+        visits(p, to)
+
+      _html ->
+        p
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Tasks — state-changing actions
   # ---------------------------------------------------------------------------
