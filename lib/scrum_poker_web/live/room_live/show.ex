@@ -339,6 +339,7 @@ defmodule ScrumPokerWeb.RoomLive.Show do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen flex flex-col bg-base-100">
+      <Layouts.flash_group flash={@flash} />
       <%!-- Room header --%>
       <div class="navbar bg-base-200 shadow-sm px-4 gap-3 flex-shrink-0">
         <.link

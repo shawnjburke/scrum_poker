@@ -229,6 +229,65 @@ defmodule ScrumPokerWeb.Persona do
     p
   end
 
+  @doc "Asserts a room code is displayed in the persona's view."
+  def sees_a_room_code(%__MODULE__{} = p) do
+    html = render(p.view)
+    assert p.room_code, "Persona has no room_code set"
+    assert html =~ p.room_code, "Expected room code '#{p.room_code}' to be visible"
+    p
+  end
+
+  @doc "Asserts a participant name appears in the participant list."
+  def sees_in_participants(%__MODULE__{} = p, name) do
+    html = render(p.view)
+    assert html =~ name, "Expected '#{name}' to appear in participants"
+    p
+  end
+
+  @doc "Asserts a specific number of pending tickets are in the queue."
+  def sees_tickets_in_queue(%__MODULE__{} = p, count) do
+    html = render(p.view)
+    actual = Regex.scan(~r/phx-click="start_ticket"/, html) |> length()
+
+    assert actual == count,
+           "Expected #{count} ticket(s) in queue, found #{actual}"
+
+    p
+  end
+
+  @doc "Asserts arbitrary text is visible to the persona."
+  def sees_text(%__MODULE__{} = p, text) do
+    html = render(p.view)
+    assert html =~ text, "Expected to see '#{text}' on the page"
+    p
+  end
+
+  @doc "Re-mounts the persona's view to refresh state (useful after another persona triggers presence changes)."
+  def refreshes(%__MODULE__{room_code: code} = p) when is_binary(code) do
+    enter_room(p, code)
+  end
+
+  @doc """
+  Imports a CSV string as if uploaded through the Jira import UI.
+  Opens the form, uploads the file, and submits.
+  """
+  def imports_csv(%__MODULE__{} = p, csv_content) do
+    p.view |> element("button[phx-click='toggle_import']") |> render_click()
+
+    file = %{
+      name: "tickets.csv",
+      content: csv_content,
+      type: "text/csv",
+      last_modified: 1_700_000_000_000
+    }
+
+    input = file_input(p.view, "#import-form", :jira_csv, [file])
+    render_upload(input, "tickets.csv")
+
+    p.view |> form("#import-form") |> render_submit()
+    p
+  end
+
   # ---------------------------------------------------------------------------
   # Internals
   # ---------------------------------------------------------------------------
