@@ -70,7 +70,8 @@ defmodule ScrumPoker.MixProject do
       {:ueberauth, "~> 0.10"},
       {:ueberauth_google, "~> 0.12"},
       {:ueberauth_microsoft, "~> 0.25"},
-      {:ueberauth_github, "~> 0.8"}
+      {:ueberauth_github, "~> 0.8"},
+      {:cabbage, "~> 0.4", only: :test}
     ]
   end
 
