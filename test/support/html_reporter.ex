@@ -132,6 +132,8 @@ defmodule ScrumPokerWeb.HtmlReporter do
 
     #{render_summary(state)}
 
+    #{render_expand_controls()}
+
     #{render_feature_groups(state.features)}
     """
 
@@ -147,15 +149,20 @@ defmodule ScrumPokerWeb.HtmlReporter do
   defp render_feature_group({name, scenarios}) do
     failed = Enum.count(scenarios, &(&1.status == :failed))
     badge = status_badge(failed)
+    count = length(scenarios)
 
     """
-    <div class="feature">
-      <div class="feature-header">
+    <details class="feature">
+      <summary class="feature-header">
+        <span class="caret">▸</span>
         <span class="feature-title">#{html_escape(name)}</span>
+        <span class="feature-count">#{count}</span>
         #{badge}
+      </summary>
+      <div class="scenarios">
+        #{Enum.map_join(scenarios, "\n", &render_scenario_row/1)}
       </div>
-      #{Enum.map_join(scenarios, "\n", &render_scenario_row/1)}
-    </div>
+    </details>
     """
   end
 
@@ -191,6 +198,8 @@ defmodule ScrumPokerWeb.HtmlReporter do
     </p>
 
     #{render_features_summary(feature_files, cabbage_scenarios)}
+
+    #{render_expand_controls()}
 
     #{Enum.map_join(feature_files, "\n", &render_gherkin_feature(&1, cabbage_scenarios))}
 
@@ -251,16 +260,32 @@ defmodule ScrumPokerWeb.HtmlReporter do
   end
 
   defp render_gherkin_feature(%{name: name, description: desc, scenarios: scenarios}, results) do
+    failed =
+      Enum.count(scenarios, fn sc ->
+        case Map.get(results, scenario_key(sc.title)) do
+          %{status: :passed} -> false
+          _ -> true
+        end
+      end)
+
+    badge = status_badge(failed)
+    count = length(scenarios)
+
     """
-    <div class="feature">
-      <div class="feature-header">
-        <div>
+    <details class="feature">
+      <summary class="feature-header">
+        <span class="caret">▸</span>
+        <div class="feature-title-block">
           <div class="feature-title">Feature: #{html_escape(name)}</div>
           #{render_description(desc)}
         </div>
+        <span class="feature-count">#{count}</span>
+        #{badge}
+      </summary>
+      <div class="scenarios">
+        #{Enum.map_join(scenarios, "\n", &render_gherkin_scenario(&1, results))}
       </div>
-      #{Enum.map_join(scenarios, "\n", &render_gherkin_scenario(&1, results))}
-    </div>
+    </details>
     """
   end
 
@@ -485,12 +510,34 @@ defmodule ScrumPokerWeb.HtmlReporter do
       <div class="container">
         #{body}
       </div>
+      <script>
+        document.querySelectorAll('[data-action="expand-all"]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            document.querySelectorAll('details.feature').forEach(function(d) { d.open = true; });
+          });
+        });
+        document.querySelectorAll('[data-action="collapse-all"]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            document.querySelectorAll('details.feature').forEach(function(d) { d.open = false; });
+          });
+        });
+      </script>
     </body>
     </html>
     """
   end
 
   defp nav_class(name, active), do: if(name == active, do: "nav-link active", else: "nav-link")
+
+  defp render_expand_controls do
+    """
+    <div class="expand-controls">
+      <button type="button" data-action="expand-all" class="link-btn">Expand all</button>
+      <span class="sep">·</span>
+      <button type="button" data-action="collapse-all" class="link-btn">Collapse all</button>
+    </div>
+    """
+  end
 
   defp render_summary(state) do
     """
@@ -560,15 +607,42 @@ defmodule ScrumPokerWeb.HtmlReporter do
     .fail .num { color: var(--red); }
     .feature {
       background: var(--card); border: 1px solid var(--border);
-      border-radius: 0.75rem; margin-bottom: 1rem; overflow: hidden;
+      border-radius: 0.75rem; margin-bottom: 0.5rem; overflow: hidden;
     }
+    .feature[open] { margin-bottom: 1rem; }
     .feature-header {
-      padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
-      background: #fafafa;
+      padding: 0.875rem 1.25rem;
+      display: flex; align-items: center; gap: 0.75rem;
+      background: #fafafa; cursor: pointer; list-style: none;
+      user-select: none;
     }
-    .feature-title { font-weight: 600; font-size: 1.1rem; }
+    .feature-header::-webkit-details-marker { display: none; }
+    .feature-header:hover { background: #f3f4f6; }
+    .feature[open] .feature-header { border-bottom: 1px solid var(--border); }
+    .caret {
+      color: var(--gray); transition: transform 0.15s ease; flex-shrink: 0;
+      display: inline-block; font-size: 0.85rem;
+    }
+    .feature[open] .caret { transform: rotate(90deg); }
+    .feature-title-block { flex: 1; min-width: 0; }
+    .feature-title { font-weight: 600; font-size: 1.05rem; flex: 1; }
+    .feature-title-block .feature-title { flex: initial; }
     .feature-desc { color: var(--gray); font-size: 0.875rem; margin-top: 0.25rem; }
+    .feature-count {
+      color: var(--gray); font-size: 0.85rem; font-variant-numeric: tabular-nums;
+      background: var(--bg); padding: 0.125rem 0.5rem; border-radius: 9999px;
+      flex-shrink: 0;
+    }
+    .scenarios { padding-top: 0.25rem; }
+    .expand-controls {
+      margin-bottom: 1rem; font-size: 0.85rem; color: var(--gray);
+    }
+    .link-btn {
+      background: none; border: none; color: var(--primary); cursor: pointer;
+      padding: 0; font-size: 0.85rem; font-family: inherit;
+    }
+    .link-btn:hover { text-decoration: underline; }
+    .sep { margin: 0 0.5rem; }
     .scenario {
       padding: 0.875rem 1.5rem; border-bottom: 1px solid var(--border);
       display: flex; align-items: center; gap: 0.75rem;

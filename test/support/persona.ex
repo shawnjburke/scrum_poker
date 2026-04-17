@@ -40,7 +40,8 @@ defmodule ScrumPokerWeb.Persona do
     :user,
     :room,
     :room_code,
-    :guest_token
+    :guest_token,
+    :last_csv
   ]
 
   # ---------------------------------------------------------------------------
@@ -259,6 +260,29 @@ defmodule ScrumPokerWeb.Persona do
   def sees_text(%__MODULE__{} = p, text) do
     html = render(p.view)
     assert html =~ text, "Expected to see '#{text}' on the page"
+    p
+  end
+
+  @doc "Asserts a card with the given value is available for voting."
+  def sees_card(%__MODULE__{} = p, value) do
+    html = render(p.view)
+    pattern = ~r/phx-value-card="#{Regex.escape(value)}"/
+
+    assert Regex.match?(pattern, html),
+           "Expected card '#{value}' to be available for voting"
+
+    p
+  end
+
+  @doc "Downloads the session history CSV via the export endpoint."
+  def downloads_history_csv(%__MODULE__{} = p) do
+    conn = Phoenix.ConnTest.get(p.conn, "/rooms/#{p.room_code}/export.csv")
+    %{p | last_csv: conn.resp_body}
+  end
+
+  @doc "Asserts the most recently downloaded CSV contains the given text."
+  def csv_includes(%__MODULE__{last_csv: csv} = p, text) when is_binary(csv) do
+    assert csv =~ text, "Expected CSV to contain '#{text}'"
     p
   end
 
