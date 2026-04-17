@@ -1,8 +1,10 @@
 defmodule ScrumPokerWeb.PageControllerTest do
   use ScrumPokerWeb.ConnCase
 
-  test "GET /", %{conn: conn} do
+  test "GET / shows the ScrumPoker landing page", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Peace of mind from prototype to production"
+    response = html_response(conn, 200)
+    assert response =~ "ScrumPoker"
+    assert response =~ "Real-time planning poker"
   end
 end

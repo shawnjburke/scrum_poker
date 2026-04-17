@@ -42,3 +42,6 @@ npm-debug.log
 start_dev.bat
 .env
 
+# Test reports (generated)
+/test/reports/
+
